@@ -156,29 +156,136 @@ async function bootstrapData() {
     }
 
     // 3. Seed Committee, Founders, History, Assets, and Transactions if completely empty
+    // Clear dummy members if they exist to force reseeding the actual members
+    const dummyCheck = await CommitteeMember.findOne({ name: 'Dr. Anand Verma' });
+    if (dummyCheck) {
+      logger.info('🧹 Cleaning up dummy committee members for new premium seeding...');
+      await CommitteeMember.deleteMany({ category: { $in: ['Current Committee', 'Past Member'] } });
+    }
+
     const memberCount = await CommitteeMember.countDocuments();
     if (memberCount === 0) {
       await CommitteeMember.create([
+        // Main Office Bearers
         {
-          name: 'Dr. Anand Verma',
-          role: 'Current President',
-          periodStart: '2018',
+          name: 'Badodhe Sreenu',
+          role: 'Chairman',
+          periodStart: '2026',
           periodEnd: 'Present',
-          bio: 'Leading the modern transformation of temple facilities while preserving ancient traditions.',
+          bio: 'Directing the trust board, fostering spiritual growth, and leading major development programs.',
           category: 'Current Committee',
-          email: 'anand.verma@sridurgamatatemple.org',
-          phone: '+91 98480 12345',
+          email: 'chairman@sridurgamatatemple.org',
+          phone: '9848431244',
         },
         {
-          name: 'Smt. Kavita Reddy',
-          role: 'Chief Treasurer',
-          periodStart: '2020',
+          name: 'Goutham Anil Kumar',
+          role: 'General Secretary',
+          periodStart: '2026',
           periodEnd: 'Present',
-          bio: 'Overseeing the financial transparency and digitalization of temple records.',
+          bio: 'Managing overall administration, coordinating programs, and handling correspondence.',
           category: 'Current Committee',
-          email: 'kavita.reddy@sridurgamatatemple.org',
-          phone: '+91 98480 54321',
+          email: 'secretary@sridurgamatatemple.org',
+          phone: '9652079793',
         },
+        {
+          name: 'Gudipalli Ganesh',
+          role: 'Treasurer',
+          periodStart: '2026',
+          periodEnd: 'Present',
+          bio: 'Overseeing all temple accounts, verifying donation books, and directing financial planning.',
+          category: 'Current Committee',
+          email: 'treasurer@sridurgamatatemple.org',
+          phone: '9849871099',
+        },
+        // Vice Chairmen
+        {
+          name: 'N. Yadaiah',
+          role: 'Vice Chairman',
+          periodStart: '2026',
+          periodEnd: 'Present',
+          bio: 'Supporting administrative functions and community outreach coordination.',
+          category: 'Current Committee',
+        },
+        {
+          name: 'K. Venkatesh Gupta',
+          role: 'Vice Chairman',
+          periodStart: '2026',
+          periodEnd: 'Present',
+          bio: 'Assisting in trust board coordination and spiritual event management.',
+          category: 'Current Committee',
+        },
+        // Joint Secretaries
+        {
+          name: 'J. Ramesh',
+          role: 'Joint Secretary',
+          periodStart: '2026',
+          periodEnd: 'Present',
+          bio: 'Assisting the General Secretary in daily administrative records and schedules.',
+          category: 'Current Committee',
+        },
+        {
+          name: 'P. Srisailam',
+          role: 'Joint Secretary',
+          periodStart: '2026',
+          periodEnd: 'Present',
+          bio: 'Coordinating operational meetings and public relations.',
+          category: 'Current Committee',
+        },
+        // Organising Secretaries
+        {
+          name: 'B. Nagaraj',
+          role: 'Organising Secretary',
+          periodStart: '2026',
+          periodEnd: 'Present',
+          bio: 'Organising volunteers, materials, and infrastructure for main festivals.',
+          category: 'Current Committee',
+        },
+        {
+          name: 'Rahul Kumar Sharma',
+          role: 'Organising Secretary',
+          periodStart: '2026',
+          periodEnd: 'Present',
+          bio: 'Managing social media communications, event logistics, and volunteer databases.',
+          category: 'Current Committee',
+        },
+        {
+          name: 'G. Madhavi Latha',
+          role: 'Organising Secretary',
+          periodStart: '2026',
+          periodEnd: 'Present',
+          bio: 'Coordinating women devotee activities and Navratri festival arrangements.',
+          category: 'Current Committee',
+        },
+        {
+          name: 'M. Manjula',
+          role: 'Organising Secretary',
+          periodStart: '2026',
+          periodEnd: 'Present',
+          bio: 'Directing community service drives and prasadam distribution planning.',
+          category: 'Current Committee',
+        },
+        // Executive Members
+        { name: 'M. Vignesh Goud', role: 'Executive Member', periodStart: '2026', periodEnd: 'Present', category: 'Current Committee' },
+        { name: 'V. Venkatesh', role: 'Executive Member', periodStart: '2026', periodEnd: 'Present', category: 'Current Committee' },
+        { name: 'B. Deepak Kumar', role: 'Executive Member', periodStart: '2026', periodEnd: 'Present', category: 'Current Committee' },
+        { name: 'K. Chandra Shekhar', role: 'Executive Member', periodStart: '2026', periodEnd: 'Present', category: 'Current Committee' },
+        { name: 'N. Srinath', role: 'Executive Member', periodStart: '2026', periodEnd: 'Present', category: 'Current Committee' },
+        { name: 'C. Mahesh Goud', role: 'Executive Member', periodStart: '2026', periodEnd: 'Present', category: 'Current Committee' },
+        { name: 'M. Bheem Rao', role: 'Executive Member', periodStart: '2026', periodEnd: 'Present', category: 'Current Committee' },
+        { name: 'L. Harishwar Reddy', role: 'Executive Member', periodStart: '2026', periodEnd: 'Present', category: 'Current Committee' },
+        { name: 'N. Srikanth', role: 'Executive Member', periodStart: '2026', periodEnd: 'Present', category: 'Current Committee' },
+        { name: 'P. Teja', role: 'Executive Member', periodStart: '2026', periodEnd: 'Present', category: 'Current Committee' },
+        { name: 'B. Sai Deepak', role: 'Executive Member', periodStart: '2026', periodEnd: 'Present', category: 'Current Committee' },
+        { name: 'M. Vinay Kumar', role: 'Executive Member', periodStart: '2026', periodEnd: 'Present', category: 'Current Committee' },
+        { name: 'K. Raj', role: 'Executive Member', periodStart: '2026', periodEnd: 'Present', category: 'Current Committee' },
+        { name: 'J. Jatin', role: 'Executive Member', periodStart: '2026', periodEnd: 'Present', category: 'Current Committee' },
+        { name: 'Y. Malathi', role: 'Executive Member', periodStart: '2026', periodEnd: 'Present', category: 'Current Committee' },
+        // Advisors
+        { name: 'I. Somasundaram', role: 'Advisor', periodStart: '2026', periodEnd: 'Present', bio: 'Senior guidance on traditional temple architecture and rituals.', category: 'Current Committee' },
+        { name: 'V. Gnaneshwar', role: 'Advisor', periodStart: '2026', periodEnd: 'Present', bio: 'Advising on statutory compliance, audits, and administration.', category: 'Current Committee' },
+        { name: 'G. Laxman Das', role: 'Advisor', periodStart: '2026', periodEnd: 'Present', bio: 'Providing strategic counsel for social services and expansion.', category: 'Current Committee' },
+        
+        // Retain former secretary from original seed for history archives
         {
           name: 'Shri G. Ramesh',
           role: 'General Secretary',
@@ -190,7 +297,60 @@ async function bootstrapData() {
           phone: '+91 94401 22334',
         },
       ]);
-      logger.info('🌱 Seeded committee members.');
+      logger.info('🌱 Seeded 29 actual committee members + 1 past member.');
+    }
+
+    // Migrate existing members to support structured categories
+    const unmigratedCount = await CommitteeMember.countDocuments({ role_category: { $exists: false } });
+    if (unmigratedCount > 0) {
+      logger.info(`🔄 Found ${unmigratedCount} unmigrated committee members. Running migration...`);
+      const unmigrated = await CommitteeMember.find({ role_category: { $exists: false } });
+      
+      const roleCategoriesOrder = [
+        'CHAIRMAN', 'GENERAL_SECRETARY', 'TREASURER', 'VICE_CHAIRMAN', 
+        'JOINT_SECRETARY', 'ORGANISING_SECRETARY', 'EXECUTIVE_MEMBER', 
+        'ADVISOR', 'PAST_MEMBER'
+      ];
+      
+      // Let's group them first to assign sequential order within each category
+      const counts: { [key: string]: number } = {};
+      roleCategoriesOrder.forEach(cat => { counts[cat] = 0; });
+
+      for (const member of unmigrated) {
+        let roleCat: any = 'EXECUTIVE_MEMBER';
+        const roleLower = (member.role || member.designation || '').toLowerCase();
+        
+        if (member.category === 'Past Member') {
+          roleCat = 'PAST_MEMBER';
+        } else if (roleLower.includes('chairman')) {
+          roleCat = 'CHAIRMAN';
+        } else if (roleLower.includes('general secretary') || roleLower.includes('general-secretary')) {
+          roleCat = 'GENERAL_SECRETARY';
+        } else if (roleLower.includes('treasurer')) {
+          roleCat = 'TREASURER';
+        } else if (roleLower.includes('vice chairman') || roleLower.includes('vice-chairman') || roleLower.includes('vice chairmen')) {
+          roleCat = 'VICE_CHAIRMAN';
+        } else if (roleLower.includes('joint secretary') || roleLower.includes('joint-secretary') || roleLower.includes('joint secretaries')) {
+          roleCat = 'JOINT_SECRETARY';
+        } else if (roleLower.includes('organising secretary') || roleLower.includes('organizing secretary') || roleLower.includes('organising secretaries')) {
+          roleCat = 'ORGANISING_SECRETARY';
+        } else if (roleLower.includes('advisor') || roleLower.includes('advisors')) {
+          roleCat = 'ADVISOR';
+        }
+        
+        member.set('role_category', roleCat);
+        member.set('roleCategory', roleCat);
+        member.set('is_active', member.category !== 'Past Member');
+        member.set('isActive', member.category !== 'Past Member');
+        
+        // Assign display order sequentially within its category
+        member.set('display_order', counts[roleCat]);
+        member.set('displayOrder', counts[roleCat]);
+        counts[roleCat] += 1;
+        
+        await member.save();
+      }
+      logger.info('✅ Committee members migration completed.');
     }
 
     const founderCount = await Founder.countDocuments();

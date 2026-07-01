@@ -26,6 +26,13 @@ router.put(
   committeeController.updateCommittee
 );
 
+router.put(
+  '/reorder',
+  authenticateJWT,
+  requireRoles(['Super Admin', 'Content Manager']),
+  committeeController.reorderCommittee
+);
+
 router.delete(
   '/:id', 
   authenticateJWT, 

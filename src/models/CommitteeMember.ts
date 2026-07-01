@@ -65,6 +65,34 @@ const CommitteeMemberSchema = new Schema(
       enum: ['Current Committee', 'Past Member'],
       default: 'Current Committee',
     },
+    role_category: {
+      type: String,
+      enum: ['CHAIRMAN', 'GENERAL_SECRETARY', 'TREASURER', 'VICE_CHAIRMAN', 'JOINT_SECRETARY', 'ORGANISING_SECRETARY', 'EXECUTIVE_MEMBER', 'ADVISOR', 'PAST_MEMBER'],
+      default: 'EXECUTIVE_MEMBER',
+    },
+    roleCategory: {
+      type: String,
+    },
+    display_order: {
+      type: Number,
+      default: 0,
+    },
+    displayOrder: {
+      type: Number,
+    },
+    is_active: {
+      type: Boolean,
+      default: true,
+    },
+    isActive: {
+      type: Boolean,
+    },
+    photo_url: {
+      type: String,
+    },
+    photoUrl: {
+      type: String,
+    },
   },
   {
     timestamps: true,
@@ -88,6 +116,26 @@ CommitteeMemberSchema.pre('save', function (next) {
   // Sync biography and bio
   if (doc.biography && !doc.bio) doc.bio = doc.biography;
   if (doc.bio && !doc.biography) doc.biography = doc.bio;
+
+  // Sync roleCategory and role_category
+  if (doc.roleCategory && !doc.get('role_category')) doc.set('role_category', doc.roleCategory);
+  if (doc.get('role_category') && !doc.roleCategory) doc.roleCategory = doc.get('role_category');
+
+  // Sync displayOrder and display_order
+  if (doc.displayOrder !== undefined && doc.get('display_order') === undefined) doc.set('display_order', doc.displayOrder);
+  if (doc.get('display_order') !== undefined && doc.displayOrder === undefined) doc.displayOrder = doc.get('display_order');
+
+  // Sync isActive and is_active
+  if (doc.isActive !== undefined && doc.get('is_active') === undefined) doc.set('is_active', doc.isActive);
+  if (doc.get('is_active') !== undefined && doc.isActive === undefined) doc.isActive = doc.get('is_active');
+
+  // Sync photoUrl, photo_url, imageUrl, and image
+  if (doc.photoUrl && !doc.get('photo_url')) doc.set('photo_url', doc.photoUrl);
+  if (doc.get('photo_url') && !doc.photoUrl) doc.photoUrl = doc.get('photo_url');
+  if (doc.imageUrl && !doc.get('photo_url')) doc.set('photo_url', doc.imageUrl);
+  if (doc.get('photo_url') && !doc.imageUrl) doc.imageUrl = doc.get('photo_url');
+  if (doc.image && !doc.get('photo_url')) doc.set('photo_url', doc.image);
+  if (doc.get('photo_url') && !doc.image) doc.image = doc.get('photo_url');
 
   // Sync contact details
   if (!doc.contactDetails) doc.contactDetails = { email: '', phone: '' };
