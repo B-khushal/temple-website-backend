@@ -37,6 +37,7 @@ import { HistoryTimeline } from './models/HistoryTimeline';
 import { Gallery } from './models/Gallery';
 import { FinancialTransaction } from './models/FinancialTransaction';
 import { Donation } from './models/Donation';
+import { WebsiteSetting } from './models/WebsiteSetting';
 import mongoose from 'mongoose';
 
 const app = express();
@@ -132,6 +133,118 @@ app.use(errorHandler);
 // Seeding Initial Data
 async function bootstrapData() {
   try {
+    // 0. Website Visibility Settings Seeding
+    const defaultVisibilitySettings = [
+      // Home Page Controls
+      { key: 'hero_enabled', label: 'Hero Section', description: 'Enable or disable the main hero section banner at the top of the home page.', category: 'Home Page Controls', previewIcon: 'Layout', enabled: true },
+      { key: 'statistics_enabled', label: 'Statistics', description: 'Display real-time statistics (devotee counts, ledger status, heritage years) on the home page.', category: 'Home Page Controls', previewIcon: 'BarChart2', enabled: true },
+      { key: 'stat_heritage_enabled', label: 'Stat: Heritage Legacy', description: 'Show the Heritage Legacy (Years) statistic card on the home page.', category: 'Home Page Controls', previewIcon: 'Calendar', enabled: true },
+      { key: 'stat_devotees_enabled', label: 'Stat: Devotee Family', description: 'Show the Devotee Family (Count) statistic card on the home page.', category: 'Home Page Controls', previewIcon: 'Users', enabled: true },
+      { key: 'stat_assets_enabled', label: 'Stat: Assets Value', description: 'Show the Assets Value (INR) statistic card on the home page.', category: 'Home Page Controls', previewIcon: 'DollarSign', enabled: true },
+      { key: 'stat_committee_enabled', label: 'Stat: Committee Members', description: 'Show the Committee Members statistic card on the home page.', category: 'Home Page Controls', previewIcon: 'Award', enabled: true },
+      { key: 'stat_band_devotees_enabled', label: 'Stat Band: Registered Devotees', description: 'Show Registered Devotees counter in the real-time statistics band.', category: 'Home Page Controls', previewIcon: 'Users', enabled: true },
+      { key: 'stat_band_funds_enabled', label: 'Stat Band: Devotion Funds', description: 'Show Total Devotion Funds counter in the real-time statistics band.', category: 'Home Page Controls', previewIcon: 'Heart', enabled: true },
+      { key: 'stat_band_ledger_enabled', label: 'Stat Band: Audited Ledger', description: 'Show Audited Ledger counter in the real-time statistics band.', category: 'Home Page Controls', previewIcon: 'ShieldCheck', enabled: true },
+      { key: 'welcome_enabled', label: 'Welcome Message', description: 'Show the formal welcome message from the temple trust on the home page.', category: 'Home Page Controls', previewIcon: 'MessageSquare', enabled: true },
+      { key: 'highlights_enabled', label: 'Temple Highlights', description: 'Show highlighted temple services or features on the home page.', category: 'Home Page Controls', previewIcon: 'Sparkles', enabled: true },
+      { key: 'featured_sections_enabled', label: 'Featured Sections', description: 'Conditionally show featured cards linking to other parts of the site.', category: 'Home Page Controls', previewIcon: 'Grid', enabled: true },
+
+      // Temple Information
+      { key: 'about_enabled', label: 'About Temple', description: 'Toggle visibility of the "About Temple" section and details page.', category: 'Temple Information', previewIcon: 'Info', enabled: true },
+      { key: 'temple_history_enabled', label: 'Temple History', description: 'Show the historical timeline of the temple.', category: 'Temple Information', previewIcon: 'History', enabled: true },
+      { key: 'founders_enabled', label: 'Founders', description: 'Toggle visibility of the temple founders information.', category: 'Temple Information', previewIcon: 'Users', enabled: true },
+      { key: 'founders_history_enabled', label: 'Founders Timeline', description: 'Display a detailed timeline of events related to the founders.', category: 'Temple Information', previewIcon: 'GitCommit', enabled: true },
+      { key: 'mission_vision_enabled', label: 'Mission & Vision', description: 'Show the temple mission, vision, and core spiritual values cards.', category: 'Temple Information', previewIcon: 'Target', enabled: true },
+
+      // Committee Management
+      { key: 'committee_enabled', label: 'Committee Section', description: 'Enable/disable the public board committee page and section.', category: 'Committee Management', previewIcon: 'Award', enabled: true },
+      { key: 'chairman_card_enabled', label: 'Chairman Card', description: 'Show the details card of the Committee Chairman.', category: 'Committee Management', previewIcon: 'UserCheck', enabled: true },
+      { key: 'gen_secretary_card_enabled', label: 'General Secretary Card', description: 'Show the details card of the General Secretary.', category: 'Committee Management', previewIcon: 'UserCheck', enabled: true },
+      { key: 'treasurer_card_enabled', label: 'Treasurer Card', description: 'Show the details card of the Committee Treasurer.', category: 'Committee Management', previewIcon: 'UserCheck', enabled: true },
+      { key: 'advisors_enabled', label: 'Advisors', description: 'Show the advisors grid in the committee page.', category: 'Committee Management', previewIcon: 'HelpCircle', enabled: true },
+      { key: 'executive_members_enabled', label: 'Executive Members', description: 'Show executive committee members in the committee list.', category: 'Committee Management', previewIcon: 'Users', enabled: true },
+      { key: 'former_members_enabled', label: 'Former Members Archive', description: 'Show past members directory archive.', category: 'Committee Management', previewIcon: 'Archive', enabled: true },
+
+      // Donations
+      { key: 'donations_enabled', label: 'Enable Donations', description: 'Globally enable or disable online donations.', category: 'Donations', previewIcon: 'Heart', enabled: true },
+      { key: 'donation_progress_enabled', label: 'Donation Progress Bar', description: 'Show progress bar towards the annual fundraising goals.', category: 'Donations', previewIcon: 'Percent', enabled: true },
+      { key: 'donation_campaigns_enabled', label: 'Donation Campaigns', description: 'Show specific running donation programs and drives.', category: 'Donations', previewIcon: 'Flag', enabled: true },
+      { key: 'donation_qr_enabled', label: 'QR Donations', description: 'Display official UPI QR Code for quick scans.', category: 'Donations', previewIcon: 'QrCode', enabled: true },
+      { key: 'donation_bank_details_enabled', label: 'Bank Account Details', description: 'Display direct bank transfer coordinates (IBAN, IFSC, Account Number).', category: 'Donations', previewIcon: 'CreditCard', enabled: true },
+      { key: 'donation_upi_enabled', label: 'UPI Payments', description: 'Show UPI payment address and handle detail cards.', category: 'Donations', previewIcon: 'Smartphone', enabled: true },
+      { key: 'donation_history_enabled', label: 'Donation History', description: 'Allow public viewing of recent verified donations ledger.', category: 'Donations', previewIcon: 'FileText', enabled: false },
+      { key: 'sponsors_enabled', label: 'Sponsor Wall', description: 'Show logos and details of official temple sponsors.', category: 'Donations', previewIcon: 'Briefcase', enabled: false },
+      { key: 'top_donors_enabled', label: 'Top Donors', description: 'Show top contributors hall of fame.', category: 'Donations', previewIcon: 'TrendingUp', enabled: false },
+
+      // Assets & Financial Transparency
+      { key: 'assets_enabled', label: 'Temple Assets', description: 'Toggle visibility of the temple assets overview page.', category: 'Assets & Financial Transparency', previewIcon: 'Home', enabled: true },
+      { key: 'asset_gallery_enabled', label: 'Asset Gallery', description: 'Show photographs of physical assets and lands.', category: 'Assets & Financial Transparency', previewIcon: 'Image', enabled: true },
+      { key: 'asset_buildings_enabled', label: 'Buildings', description: 'Show details of buildings and constructions owned by the trust.', category: 'Assets & Financial Transparency', previewIcon: 'Building2', enabled: true },
+      { key: 'asset_land_enabled', label: 'Land Information', description: 'Show records of lands and properties.', category: 'Assets & Financial Transparency', previewIcon: 'Map', enabled: true },
+      { key: 'asset_vehicles_enabled', label: 'Vehicles', description: 'Show records of temple vehicles and chariots.', category: 'Assets & Financial Transparency', previewIcon: 'Truck', enabled: true },
+      { key: 'asset_gold_enabled', label: 'Gold Assets', description: 'Show gold, silver, and ornament registry valuations.', category: 'Assets & Financial Transparency', previewIcon: 'Activity', enabled: true },
+      { key: 'asset_financial_reports_enabled', label: 'Financial Reports', description: 'Show public financial summary statements.', category: 'Assets & Financial Transparency', previewIcon: 'PieChart', enabled: false },
+      { key: 'asset_audit_reports_enabled', label: 'Audit Reports', description: 'Show official third-party audit clearance certificates.', category: 'Assets & Financial Transparency', previewIcon: 'FileCheck', enabled: false },
+      { key: 'asset_annual_statements_enabled', label: 'Annual Statements', description: 'Download links for annual balance sheets.', category: 'Assets & Financial Transparency', previewIcon: 'Download', enabled: false },
+      { key: 'asset_transparency_dashboard_enabled', label: 'Transparency Dashboard', description: 'Show visual charts of income and expense allocation.', category: 'Assets & Financial Transparency', previewIcon: 'Compass', enabled: true },
+
+      // Media
+      { key: 'gallery_enabled', label: 'Photo Gallery', description: 'Enable photo gallery media viewer.', category: 'Media', previewIcon: 'Image', enabled: true },
+      { key: 'videos_enabled', label: 'Video Gallery', description: 'Show video library folder cards.', category: 'Media', previewIcon: 'Video', enabled: true },
+      { key: 'temple_videos_enabled', label: 'Temple Videos', description: 'Show direct video streams or uploaded videos.', category: 'Media', previewIcon: 'Play', enabled: true },
+      { key: 'live_stream_enabled', label: 'Live Streaming', description: 'Toggle live streaming feature (Aarti / Darshan broadcasts).', category: 'Media', previewIcon: 'Radio', enabled: false },
+      { key: 'youtube_embeds_enabled', label: 'YouTube Embeds', description: 'Embed official YouTube channel highlights.', category: 'Media', previewIcon: 'Youtube', enabled: true },
+
+      // Events & Festivals
+      { key: 'events_enabled', label: 'Events', description: 'Enable upcoming events listings and calendar.', category: 'Events & Festivals', previewIcon: 'Calendar', enabled: true },
+      { key: 'festival_enabled', label: 'Upcoming Festivals', description: 'Show special festival announcements and countdowns.', category: 'Events & Festivals', previewIcon: 'Flame', enabled: false },
+      { key: 'announcements_enabled', label: 'Announcements', description: 'Show high-priority flash banner notifications.', category: 'Events & Festivals', previewIcon: 'Volume2', enabled: true },
+      { key: 'notices_enabled', label: 'Notices', description: 'Show public notice board and announcements lists.', category: 'Events & Festivals', previewIcon: 'Clipboard', enabled: true },
+      { key: 'celebrations_calendar_enabled', label: 'Celebrations Calendar', description: 'Show annual celebrations grid.', category: 'Events & Festivals', previewIcon: 'CalendarDays', enabled: true },
+
+      // Devotional Services
+      { key: 'pooja_enabled', label: 'Pooja Services', description: 'Allow online booking / requests for Pooja details.', category: 'Devotional Services', previewIcon: 'Bookmark', enabled: false },
+      { key: 'darshan_enabled', label: 'Darshan Booking', description: 'Allow scheduling of VIP/General Darshan passes.', category: 'Devotional Services', previewIcon: 'Ticket', enabled: false },
+      { key: 'prasadam_enabled', label: 'Prasadam Booking', description: 'Enable online home delivery order requests for Laddu / Prasadam.', category: 'Devotional Services', previewIcon: 'ShoppingBag', enabled: false },
+      { key: 'seva_enabled', label: 'Seva Booking', description: 'Enable sponsorship bookings for Archana, Abhishek, and other daily Sevas.', category: 'Devotional Services', previewIcon: 'Star', enabled: false },
+      { key: 'online_services_enabled', label: 'Online Services', description: 'Generic online application services for devotees.', category: 'Devotional Services', previewIcon: 'Globe', enabled: false },
+
+      // Community
+      { key: 'volunteer_registration_enabled', label: 'Volunteer Registration', description: 'Allow devotees to sign up as volunteers for temple events.', category: 'Community', previewIcon: 'Hand', enabled: true },
+      { key: 'testimonials_enabled', label: 'Testimonials', description: 'Show devotee feedback and experiences quotes on home page.', category: 'Community', previewIcon: 'Quote', enabled: true },
+      { key: 'member_registration_enabled', label: 'Member Registration', description: 'Allow registering as a trust member online.', category: 'Community', previewIcon: 'UserPlus', enabled: false },
+      { key: 'community_activities_enabled', label: 'Community Activities', description: 'Show updates about medical camps, schools, etc.', category: 'Community', previewIcon: 'ShieldAlert', enabled: true },
+      { key: 'newsletter_enabled', label: 'Newsletter', description: 'Show footer email updates subscription form.', category: 'Community', previewIcon: 'Send', enabled: false },
+
+      // Contact & Social
+      { key: 'contact_enabled', label: 'Contact Section', description: 'Show contact page and form.', category: 'Contact & Social', previewIcon: 'Phone', enabled: true },
+      { key: 'map_enabled', label: 'Google Maps', description: 'Embed Google map with temple location pins.', category: 'Contact & Social', previewIcon: 'MapPin', enabled: true },
+      { key: 'phone_numbers_enabled', label: 'Phone Numbers', description: 'Show direct contact telephone numbers.', category: 'Contact & Social', previewIcon: 'PhoneCall', enabled: true },
+      { key: 'email_addresses_enabled', label: 'Email Addresses', description: 'Show direct inquiry email links.', category: 'Contact & Social', previewIcon: 'Mail', enabled: true },
+      { key: 'social_links_enabled', label: 'Social Media Links', description: 'Display icons linking to Facebook, YouTube, Instagram.', category: 'Contact & Social', previewIcon: 'Share2', enabled: true },
+      { key: 'whatsapp_button_enabled', label: 'WhatsApp Button', description: 'Display floating WhatsApp direct chat support button.', category: 'Contact & Social', previewIcon: 'MessageCircle', enabled: true },
+
+      // Footer Controls
+      { key: 'footer_sections_enabled', label: 'Footer Links', description: 'Show categorized footer navigation columns.', category: 'Footer Controls', previewIcon: 'LayoutTemplate', enabled: true },
+      { key: 'copyright_enabled', label: 'Copyright', description: 'Show copyright string and developer links.', category: 'Footer Controls', previewIcon: 'Lock', enabled: true },
+      { key: 'quick_links_enabled', label: 'Quick Links', description: 'Show short quick-links checklist in footer.', category: 'Footer Controls', previewIcon: 'ExternalLink', enabled: true },
+      { key: 'visitor_counter_enabled', label: 'Visitor Counter', description: 'Show global hit counter in footer.', category: 'Footer Controls', previewIcon: 'Eye', enabled: true },
+      { key: 'privacy_policy_enabled', label: 'Privacy Policy', description: 'Show privacy policy page link.', category: 'Footer Controls', previewIcon: 'Scale', enabled: true },
+      { key: 'terms_conditions_enabled', label: 'Terms & Conditions', description: 'Show terms and conditions page link.', category: 'Footer Controls', previewIcon: 'FileSignature', enabled: true }
+    ];
+
+    let seededCount = 0;
+    for (const s of defaultVisibilitySettings) {
+      const exists = await WebsiteSetting.findOne({ key: s.key });
+      if (!exists) {
+        await WebsiteSetting.create(s);
+        seededCount++;
+      }
+    }
+    if (seededCount > 0) {
+      logger.info(`⚙️ Bootstrapped ${seededCount} new/missing Website Visibility settings.`);
+    }
+
     // 1. Settings Bootstrapping
     const settings = await Setting.findOne({ key: 'general' });
     if (!settings) {

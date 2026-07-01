@@ -222,6 +222,21 @@ export const getTransactionSummary = async (req: AuthRequest, res: Response): Pr
     const goldAssets = await Asset.find({ category: 'Gold' });
     const goldValuation = goldAssets.reduce((sum, asset) => sum + (asset.currentValue || (asset as any).currentValuation || 0), 0);
 
+    // Calculate total weight of gold assets dynamically
+    let totalGoldWeight = 0;
+    for (const asset of goldAssets) {
+      const textToSearch = `${asset.assetName || ''} ${asset.notes || ''} ${asset.description || ''}`;
+      const kgMatch = textToSearch.match(/(\d+(?:\.\d+)?)\s*kg/i);
+      if (kgMatch) {
+        totalGoldWeight += parseFloat(kgMatch[1]);
+      } else {
+        const gMatch = textToSearch.match(/(\d+(?:\.\d+)?)\s*(?:g|grams)/i);
+        if (gMatch) {
+          totalGoldWeight += parseFloat(gMatch[1]) / 1000;
+        }
+      }
+    }
+
     // Dynamic 6-month chart aggregation
     const chartData = [];
     const now = new Date();
@@ -253,7 +268,7 @@ export const getTransactionSummary = async (req: AuthRequest, res: Response): Pr
         totalExpense,
         activeDonors: activeDonorsCount,
         goldReserveValuation: goldValuation,
-        goldReserveWeight: 142.65, // base reference weight
+        goldReserveWeight: totalGoldWeight,
         chartData,
       },
       summary: {

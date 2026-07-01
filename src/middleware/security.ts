@@ -2,10 +2,10 @@ import rateLimit from 'express-rate-limit';
 import mongoSanitize from 'express-mongo-sanitize';
 import { Request, Response, NextFunction } from 'express';
 
-// Rate limiter: 100 requests per 15 minutes per IP
+// Rate limiter: 100 requests per 15 minutes per IP (much higher in development)
 export const rateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: process.env.NODE_ENV === 'production' ? 100 : 10000,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -14,10 +14,10 @@ export const rateLimiter = rateLimit({
   },
 });
 
-// Auth endpoints rate limiter: 15 requests per 15 minutes
+// Auth endpoints rate limiter: 15 requests per 15 minutes (higher in development)
 export const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 15,
+  max: process.env.NODE_ENV === 'production' ? 15 : 1000,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
