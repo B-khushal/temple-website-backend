@@ -37,6 +37,7 @@ import { HistoryTimeline } from './models/HistoryTimeline';
 import { Gallery } from './models/Gallery';
 import { FinancialTransaction } from './models/FinancialTransaction';
 import { Donation } from './models/Donation';
+import { IncomeLedger } from './models/IncomeLedger';
 import { WebsiteSetting } from './models/WebsiteSetting';
 import mongoose from 'mongoose';
 
@@ -552,29 +553,61 @@ async function bootstrapData() {
       await Donation.create([
         {
           donorName: 'Rahul Sharma Family',
-          donationType: 'Monetary',
+          donationType: 'Annadanam',
           amount: 51000,
           purpose: 'Navratri Mahotsav Sponsorship',
           paymentMethod: 'UPI',
-          receiptNumber: 'RCP-20231015-1024',
+          paymentStatus: 'Paid',
+          paidAmount: 51000,
+          dueAmount: 0,
+          receiptNumber: 'TMP-2026-000001',
           isPublic: true,
           status: 'Verified',
-          date: new Date('2023-10-15'),
+          donationDate: new Date('2026-06-15'),
+          date: new Date('2026-06-15'),
         },
         {
           donorName: 'Anonymous Devotee',
-          donationType: 'Gold',
-          amount: 0,
-          itemDescription: 'Gold chain 50g',
-          purpose: 'Offering to Deity',
-          paymentMethod: 'In-Kind',
-          receiptNumber: 'RCP-20231018-1025',
+          donationType: 'Temple Construction',
+          amount: 100000,
+          purpose: 'Sanctum restoration support',
+          paymentMethod: 'Bank Transfer',
+          paymentStatus: 'Partial',
+          paidAmount: 60000,
+          dueAmount: 40000,
+          receiptNumber: 'TMP-2026-000002',
           isPublic: false,
-          status: 'Verified',
-          date: new Date('2023-10-18'),
+          status: 'Pending',
+          donationDate: new Date('2026-06-18'),
+          date: new Date('2026-06-18'),
         },
       ]);
       logger.info('🌱 Seeded donations.');
+    }
+
+    const incomeLedgerCount = await IncomeLedger.countDocuments();
+    if (incomeLedgerCount === 0) {
+      const donations = await Donation.find({});
+      if (donations.length > 0) {
+        await IncomeLedger.insertMany(
+          donations.map((donation: any) => ({
+            ledgerType: 'income',
+            source: 'donation',
+            sourceId: donation._id,
+            category: donation.donationType,
+            description: `${donation.donorName} - ${donation.donationType}`,
+            amount: donation.amount || 0,
+            paidAmount: donation.paidAmount || donation.amount || 0,
+            dueAmount: donation.dueAmount || 0,
+            paymentStatus: donation.paymentStatus || 'Paid',
+            paymentMethod: donation.paymentMethod || 'Cash',
+            transactionDate: donation.donationDate || donation.date || new Date(),
+            receiptNumber: donation.receiptNumber,
+            createdBy: donation.createdBy,
+          }))
+        );
+        logger.info('🌱 Seeded income ledger from donations.');
+      }
     }
 
     const txnCount = await FinancialTransaction.countDocuments();

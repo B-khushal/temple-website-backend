@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import * as donationController from '../controllers/donation.controller';
-import { authenticateJWT, requireRoles } from '../middleware/auth';
+import { attachUserIfAuthenticated, authenticateJWT, requireRoles } from '../middleware/auth';
 import { validateRequest } from '../middleware/validation';
 import { donationSchema } from '../validators/donation.validator';
 
 const router = Router();
 
 // Public route to submit a donation
-router.post('/', validateRequest(donationSchema), donationController.createDonation);
+router.post('/', attachUserIfAuthenticated, validateRequest(donationSchema), donationController.createDonation);
 
 // Public route to retrieve PDF receipt
 router.get('/:id/receipt', donationController.getReceiptPDF);

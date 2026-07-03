@@ -69,6 +69,35 @@ export async function authenticateJWT(req: AuthRequest, res: Response, next: Nex
   }
 }
 
+export async function attachUserIfAuthenticated(req: AuthRequest, _res: Response, next: NextFunction) {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    next();
+    return;
+  }
+
+  const token = authHeader.split(' ')[1];
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const user = await User.findById(decoded.id);
+
+    if (user && user.isActive) {
+      req.user = {
+        id: decoded.id,
+        email: decoded.email,
+        role: decoded.role,
+        name: decoded.name,
+      };
+    }
+  } catch (err: any) {
+    logger.warn(`Optional token attachment skipped: ${err.message}`);
+  }
+
+  next();
+}
+
 export function requireRoles(allowedRoles: string[]) {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {

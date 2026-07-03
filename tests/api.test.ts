@@ -32,6 +32,7 @@ Object.defineProperty(mongoose.connection, 'db', {
 import { User } from '../src/models/User';
 import { Donation } from '../src/models/Donation';
 import { FinancialTransaction } from '../src/models/FinancialTransaction';
+import { IncomeLedger } from '../src/models/IncomeLedger';
 import { Setting } from '../src/models/Setting';
 import { Asset } from '../src/models/Asset';
 import { CommitteeMember } from '../src/models/CommitteeMember';
@@ -101,6 +102,24 @@ const mockTxn = {
   toObject: function() { return this; }
 };
 
+const mockIncomeLedger = {
+  _id: new mongoose.Types.ObjectId(),
+  ledgerType: 'income',
+  source: 'donation',
+  sourceId: mockDonationId,
+  category: 'Annadanam',
+  description: 'Devotee Sriram - Annadanam',
+  amount: 25000,
+  paidAmount: 25000,
+  dueAmount: 0,
+  paymentStatus: 'Paid',
+  paymentMethod: 'UPI',
+  receiptNumber: 'TMP-2026-000001',
+  transactionDate: new Date(),
+  createdBy: mockAdminId,
+  toObject: function() { return this; }
+};
+
 // Assign Mock static handlers to Models
 Setting.findOne = async () => ({ key: 'general', save: async () => {} } as any);
 Setting.create = async () => ({ key: 'general' } as any);
@@ -129,6 +148,7 @@ Donation.find = () => mockQueryChain([mockDonation]);
 Donation.findById = async () => mockDonation as any;
 Donation.distinct = async () => ['Devotee Sriram'];
 Donation.aggregate = async () => [{ _id: 'Monetary', total: 25000 }];
+Donation.exists = async () => null as any;
 
 // Setup Donation save mock on model prototype
 Donation.prototype.save = async function() {
@@ -154,6 +174,12 @@ FinancialTransaction.aggregate = async (pipeline: any) => {
     { _id: { year: 2026, month: 6, type: 'Income' }, total: 35000 }
   ];
 };
+
+IncomeLedger.countDocuments = async () => 1;
+IncomeLedger.insertMany = async () => [mockIncomeLedger] as any;
+IncomeLedger.find = () => mockQueryChain([mockIncomeLedger]);
+IncomeLedger.findOneAndUpdate = async () => mockIncomeLedger as any;
+IncomeLedger.deleteOne = async () => ({}) as any;
 
 AuditLog.create = async () => ({}) as any;
 AuditLog.find = () => mockQueryChain([]);
@@ -323,7 +349,7 @@ async function runTests() {
       headers: { Authorization: `Bearer ${adminToken}` },
     });
     const data = await res.json();
-    if (res.status !== 200 || !data.success || data.summary.totalIncome !== 35000) {
+    if (res.status !== 200 || !data.success || data.summary.totalIncome !== 60000) {
       throw new Error(`Financial summary calculation incorrect: ${JSON.stringify(data)}`);
     }
   });

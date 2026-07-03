@@ -11,73 +11,62 @@ export function generateDonationReceiptPDF(res: Response, donation: any): void {
 
     doc.pipe(res);
 
-    // Gold/Yellow-colored border representing sacred design
-    doc.rect(20, 20, doc.page.width - 40, doc.page.height - 40).stroke('#CFB53B');
+    doc.rect(20, 20, doc.page.width - 40, doc.page.height - 40).lineWidth(1.2).stroke('#CFB53B');
+    doc.roundedRect(32, 32, doc.page.width - 64, 54, 12).fillAndStroke('#FFF7EA', '#E7C67A');
 
-    // Header logo text
-    doc.fontSize(16).fillColor('#9B2226').text('SRI DURGA MATA TEMPLE', { align: 'center', paragraphGap: 2 });
-    doc.fontSize(8).fillColor('#3E2723').text('DEVISTHANAM & CHARITABLE TRUST', { align: 'center', paragraphGap: 10 });
-    
-    // Devotional quote
-    doc.fontSize(8).fillColor('#B7094C').text('శ్రీ శ్రీ శ్రీ దుర్గామాత నల్లపోచమ్మ దేవాలయం, బాపూనగర్', { align: 'center', paragraphGap: 10 });
+    doc.fontSize(16).fillColor('#7C5A10').text('Sri Durga Mata Temple', 40, 44, { align: 'center' });
+    doc.fontSize(9).fillColor('#5A4632').text('Premium Donation Receipt', { align: 'center' });
 
-    // Decorative line separator
-    doc.moveTo(40, 80).lineTo(doc.page.width - 40, 80).stroke('#EEDCC1');
+    const formattedDate = donation.donationDate || donation.date
+      ? new Date(donation.donationDate || donation.date).toLocaleDateString('en-IN', {
+          day: '2-digit',
+          month: 'long',
+          year: 'numeric',
+        })
+      : new Date().toLocaleDateString('en-IN');
 
-    // Title
-    doc.moveDown(0.5);
-    doc.fontSize(11).fillColor('#9B2226').text('DONATION RECEIPT', { align: 'center', underline: true });
-    doc.moveDown(0.8);
+    doc.fontSize(10).fillColor('#9B2226').text(`Receipt No: ${donation.receiptNumber}`, 40, 102);
+    doc.moveTo(40, 122).lineTo(doc.page.width - 40, 122).stroke('#EEDCC1');
 
-    const leftX = 45;
-    const rightX = 180;
-    let currentY = 120;
-
-    const formattedDate = donation.date ? new Date(donation.date).toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'long',
-      year: 'numeric'
-    }) : new Date().toLocaleDateString('en-IN');
+    const leftX = 46;
+    const rightX = 185;
+    let currentY = 144;
 
     const rows = [
-      { label: 'Receipt Number:', val: donation.receiptNumber },
-      { label: 'Receipt Date:', val: formattedDate },
-      { label: 'Donor Name:', val: donation.donorName },
-      { label: 'Mobile Number:', val: donation.mobile || 'N/A' },
-      { label: 'Donation Type:', val: donation.donationType || donation.type || 'Monetary' },
-      { label: 'Payment Method:', val: donation.paymentMethod || 'Cash' },
+      { label: 'Received From', val: donation.donorName || 'Temple Donor' },
+      { label: 'Donation Type', val: donation.donationType || donation.type || 'General Donation' },
+      { label: 'Amount', val: `Rs. ${Number(donation.amount || 0).toLocaleString('en-IN')}` },
+      { label: 'Payment Status', val: donation.paymentStatus || 'Paid' },
+      { label: 'Date', val: formattedDate },
+      { label: 'Payment Method', val: donation.paymentMethod || 'Cash' },
     ];
 
-    if (donation.transactionReference) {
-      rows.push({ label: 'Ref / TXN ID:', val: donation.transactionReference });
+    if (donation.transactionId || donation.transactionReference) {
+      rows.push({ label: 'Transaction ID', val: donation.transactionId || donation.transactionReference });
     }
 
-    const amt = parseFloat(donation.amount);
-    if (!isNaN(amt) && amt > 0) {
-      rows.push({ label: 'Amount Paid:', val: `INR ${amt.toLocaleString('en-IN')}/-` });
+    if (donation.upiReferenceNumber) {
+      rows.push({ label: 'UPI Reference', val: donation.upiReferenceNumber });
     }
 
-    if (donation.itemDescription || donation.itemDetails) {
-      rows.push({ label: 'Item Details:', val: donation.itemDescription || donation.itemDetails });
+    if (donation.purpose) {
+      rows.push({ label: 'Purpose', val: donation.purpose });
     }
-
-    rows.push({ label: 'Purpose of Seva:', val: donation.purpose || 'General Temple Fund' });
 
     rows.forEach((row) => {
-      doc.fontSize(9).fillColor('#555555').text(row.label, leftX, currentY);
-      doc.fontSize(9).fillColor('#000000').text(row.val, rightX, currentY);
-      currentY += 18;
+      doc.fontSize(8).fillColor('#907454').text(`${row.label}:`, leftX, currentY);
+      doc.fontSize(10).fillColor('#1F1A17').text(row.val, rightX, currentY, {
+        width: doc.page.width - rightX - 42,
+      });
+      currentY += 24;
     });
 
-    // Signature Area
-    currentY = doc.page.height - 75;
-    doc.fontSize(7).fillColor('#000000').text('Issued By: Temple Office', leftX, currentY);
-    doc.fontSize(7).text('Authorized Signature', doc.page.width - 150, currentY);
-
-    // Footer
-    doc.moveDown(2);
-    doc.fontSize(8).fillColor('#9B2226').text('Thank you for your contribution. Donations are tax exempt.', { align: 'center' });
-    doc.fontSize(7).fillColor('#777777').text('May the divine blessings of Sri Durga Mata Pochamma protect you.', { align: 'center' });
+    doc.fontSize(8).fillColor('#6D5844').text('Issued By: Temple Office', leftX, doc.page.height - 92);
+    doc.fontSize(8).fillColor('#6D5844').text('Authorized Signature', doc.page.width - 150, doc.page.height - 92);
+    doc.moveTo(40, doc.page.height - 54).lineTo(doc.page.width - 40, doc.page.height - 54).stroke('#EEDCC1');
+    doc.fontSize(8).fillColor('#9B2226').text('Thank you for your contribution to the trust.', 40, doc.page.height - 44, {
+      align: 'center',
+    });
 
     doc.end();
   } catch (error: any) {
@@ -87,4 +76,5 @@ export function generateDonationReceiptPDF(res: Response, donation: any): void {
     }
   }
 }
+
 export default generateDonationReceiptPDF;

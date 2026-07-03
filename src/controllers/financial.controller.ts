@@ -1,11 +1,47 @@
 import { Response } from 'express';
 import { FinancialTransaction } from '../models/FinancialTransaction';
+import { IncomeLedger } from '../models/IncomeLedger';
 import { Budget } from '../models/Budget';
 import { Donation } from '../models/Donation';
 import { Asset } from '../models/Asset';
 import { AuthRequest } from '../middleware/auth';
 import { logActivity } from '../utils/audit';
 import logger from '../config/logger';
+
+function normalizeManualTransaction(transaction: any) {
+  const doc = transaction.toObject?.() || transaction;
+  return {
+    ...doc,
+    ledgerSource: 'manual',
+    date: doc.date,
+    type: doc.type,
+    reference: doc.reference,
+    paymentStatus: doc.type === 'Income' ? 'Paid' : undefined,
+    paidAmount: doc.type === 'Income' ? doc.amount : undefined,
+    dueAmount: doc.type === 'Income' ? 0 : undefined,
+    paymentMethod: doc.type === 'Income' ? doc.paymentMethod : undefined,
+    isSystemGenerated: false,
+  };
+}
+
+function normalizeIncomeLedgerEntry(entry: any) {
+  const doc = entry.toObject?.() || entry;
+  return {
+    ...doc,
+    _id: doc._id,
+    date: doc.transactionDate,
+    type: 'Income',
+    reference: doc.receiptNumber,
+    ledgerSource: doc.source,
+    isSystemGenerated: true,
+  };
+}
+
+function sumByMonth(items: Array<{ date: Date; amount: number }>, monthStart: Date, monthEnd: Date) {
+  return items
+    .filter((item) => item.date >= monthStart && item.date <= monthEnd)
+    .reduce((sum, item) => sum + item.amount, 0);
+}
 
 // ----------------- TRANSACTIONS (LEDGER) -----------------
 
@@ -43,36 +79,53 @@ async function updateBudgetSpent(category: string, year: number, month?: number)
 export const getTransactions = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { search, type, category, page = 1, limit = 10 } = req.query;
-    const filter: any = {};
+    const manualFilter: any = {};
+    const incomeLedgerFilter: any = {};
 
     if (search) {
-      filter.$or = [
+      manualFilter.$or = [
         { category: { $regex: search, $options: 'i' } },
         { description: { $regex: search, $options: 'i' } },
         { reference: { $regex: search, $options: 'i' } },
       ];
+
+      incomeLedgerFilter.$or = [
+        { category: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { receiptNumber: { $regex: search, $options: 'i' } },
+      ];
     }
 
     if (type) {
-      filter.type = type;
+      manualFilter.type = type;
     }
 
     if (category) {
-      filter.category = category;
+      manualFilter.category = category;
+      incomeLedgerFilter.category = category;
     }
 
     const pageNum = parseInt(page as string);
     const limitNum = parseInt(limit as string);
-    const skip = (pageNum - 1) * limitNum;
+    const includeIncomeLedger = !type || type === 'Income';
 
-    const transactions = await FinancialTransaction.find(filter)
+    const manualTransactions = await FinancialTransaction.find(manualFilter)
       .sort({ date: -1 })
-      .skip(skip)
-      .limit(limitNum)
       .populate('createdBy', 'name')
       .populate('approvedBy', 'name');
 
-    const total = await FinancialTransaction.countDocuments(filter);
+    const incomeLedgerEntries = includeIncomeLedger
+      ? await IncomeLedger.find(incomeLedgerFilter).sort({ transactionDate: -1 }).populate('createdBy', 'name')
+      : [];
+
+    const combined = [
+      ...manualTransactions.map(normalizeManualTransaction),
+      ...incomeLedgerEntries.map(normalizeIncomeLedgerEntry),
+    ].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    const total = combined.length;
+    const skip = (pageNum - 1) * limitNum;
+    const transactions = combined.slice(skip, skip + limitNum);
 
     res.json({
       success: true,
@@ -194,27 +247,56 @@ export const getTransactionSummary = async (req: AuthRequest, res: Response): Pr
   try {
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
+    const startOfMonth = new Date(startOfToday.getFullYear(), startOfToday.getMonth(), 1);
+    const startOfYear = new Date(startOfToday.getFullYear(), 0, 1);
 
-    // Sum today's collections (income)
-    const todayIncomeDocs = await FinancialTransaction.find({
-      type: 'Income',
-      date: { $gte: startOfToday },
-    });
-    const todayCollection = todayIncomeDocs.reduce((sum, doc) => sum + doc.amount, 0);
-
-    // Sum overall income and expense
+    const donations = await Donation.find({ status: { $ne: 'Cancelled' } });
+    const incomeLedgerEntries = await IncomeLedger.find({});
     const allTxns = await FinancialTransaction.find({});
-    let totalIncome = 0;
-    let totalExpense = 0;
-    
-    allTxns.forEach(t => {
-      if (t.type === 'Income') totalIncome += t.amount;
-      else totalExpense += t.amount;
-    });
 
+    const todayDonations = donations
+      .filter((doc: any) => new Date(doc.donationDate || doc.date) >= startOfToday)
+      .reduce((sum: number, doc: any) => sum + (doc.amount || 0), 0);
+
+    const totalDonations = donations.reduce((sum: number, doc: any) => sum + (doc.amount || 0), 0);
+    const outstandingDues = donations.reduce((sum: number, doc: any) => sum + (doc.dueAmount || 0), 0);
+    const collectedAmount = donations.reduce((sum: number, doc: any) => sum + (doc.paidAmount || 0), 0);
+    const pendingCollections = donations.filter((doc: any) => (doc.dueAmount || 0) > 0).length;
+
+    const manualIncomeTotal = allTxns
+      .filter((txn: any) => txn.type === 'Income')
+      .reduce((sum: number, txn: any) => sum + (txn.amount || 0), 0);
+    const donationIncomeTotal = incomeLedgerEntries.reduce((sum: number, entry: any) => sum + (entry.paidAmount || 0), 0);
+    const totalIncome = manualIncomeTotal + donationIncomeTotal;
+    const totalExpense = allTxns
+      .filter((txn: any) => txn.type === 'Expense')
+      .reduce((sum: number, txn: any) => sum + (txn.amount || 0), 0);
     const totalCorpus = totalIncome - totalExpense;
 
-    // Active donors count
+    const monthlyIncome =
+      incomeLedgerEntries
+        .filter((entry: any) => new Date(entry.transactionDate) >= startOfMonth)
+        .reduce((sum: number, entry: any) => sum + (entry.paidAmount || 0), 0) +
+      allTxns
+        .filter((txn: any) => txn.type === 'Income' && new Date(txn.date) >= startOfMonth)
+        .reduce((sum: number, txn: any) => sum + (txn.amount || 0), 0);
+
+    const annualIncome =
+      incomeLedgerEntries
+        .filter((entry: any) => new Date(entry.transactionDate) >= startOfYear)
+        .reduce((sum: number, entry: any) => sum + (entry.paidAmount || 0), 0) +
+      allTxns
+        .filter((txn: any) => txn.type === 'Income' && new Date(txn.date) >= startOfYear)
+        .reduce((sum: number, txn: any) => sum + (txn.amount || 0), 0);
+
+    const todayCollection =
+      incomeLedgerEntries
+        .filter((entry: any) => new Date(entry.transactionDate) >= startOfToday)
+        .reduce((sum: number, entry: any) => sum + (entry.paidAmount || 0), 0) +
+      allTxns
+        .filter((txn: any) => txn.type === 'Income' && new Date(txn.date) >= startOfToday)
+        .reduce((sum: number, txn: any) => sum + (txn.amount || 0), 0);
+
     const uniqueDonors = await Donation.distinct('donorName');
     const activeDonorsCount = uniqueDonors.length;
 
@@ -237,24 +319,37 @@ export const getTransactionSummary = async (req: AuthRequest, res: Response): Pr
       }
     }
 
-    // Dynamic 6-month chart aggregation
     const chartData = [];
     const now = new Date();
     for (let i = 5; i >= 0; i--) {
       const startOfMonth = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
-      
-      const monthTxns = await FinancialTransaction.find({
-        date: { $gte: startOfMonth, $lte: endOfMonth }
-      });
-      
-      let income = 0;
-      let expense = 0;
-      monthTxns.forEach(t => {
-        if (t.type === 'Income') income += t.amount;
-        else expense += t.amount;
-      });
-      
+
+      const income =
+        sumByMonth(
+          incomeLedgerEntries.map((entry: any) => ({
+            date: new Date(entry.transactionDate),
+            amount: entry.paidAmount || 0,
+          })),
+          startOfMonth,
+          endOfMonth
+        ) +
+        sumByMonth(
+          allTxns
+            .filter((txn: any) => txn.type === 'Income')
+            .map((txn: any) => ({ date: new Date(txn.date), amount: txn.amount || 0 })),
+          startOfMonth,
+          endOfMonth
+        );
+
+      const expense = sumByMonth(
+        allTxns
+          .filter((txn: any) => txn.type === 'Expense')
+          .map((txn: any) => ({ date: new Date(txn.date), amount: txn.amount || 0 })),
+        startOfMonth,
+        endOfMonth
+      );
+
       const monthName = startOfMonth.toLocaleString('default', { month: 'short' });
       chartData.push({ name: monthName, income, expense });
     }
@@ -264,6 +359,13 @@ export const getTransactionSummary = async (req: AuthRequest, res: Response): Pr
       data: {
         totalCorpus,
         todayCollection,
+        todayDonations,
+        totalDonations,
+        outstandingDues,
+        collectedAmount,
+        pendingCollections,
+        monthlyIncome,
+        annualIncome,
         totalIncome,
         totalExpense,
         activeDonors: activeDonorsCount,
@@ -286,18 +388,24 @@ export const getTransactionSummary = async (req: AuthRequest, res: Response): Pr
 // Export Transactions to CSV
 export const exportTransactions = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const transactions = await FinancialTransaction.find().sort({ date: -1 });
+    const manualTransactions = await FinancialTransaction.find().sort({ date: -1 });
+    const incomeLedgerEntries = await IncomeLedger.find().sort({ transactionDate: -1 });
 
-    const headers = 'Date,Type,Category,Amount,Description,Ref\n';
-    const rows = transactions.map((t: any) => {
-      const dateStr = t.date ? new Date(t.date).toISOString().slice(0, 10) : '';
-      const desc = `"${(t.description || '').replace(/"/g, '""')}"`;
-      return `${dateStr},${t.type},${t.category},${t.amount},${desc},${t.reference || ''}`;
+    const rows = [
+      ...manualTransactions.map(normalizeManualTransaction),
+      ...incomeLedgerEntries.map(normalizeIncomeLedgerEntry),
+    ].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    const headers = 'Date,Type,Source,Category,Amount,Paid Amount,Due Amount,Payment Status,Payment Method,Description,Reference\n';
+    const csvRows = rows.map((row: any) => {
+      const dateStr = row.date ? new Date(row.date).toISOString().slice(0, 10) : '';
+      const desc = `"${(row.description || '').replace(/"/g, '""')}"`;
+      return `${dateStr},${row.type},${row.ledgerSource || 'manual'},${row.category},${row.amount || 0},${row.paidAmount || 0},${row.dueAmount || 0},${row.paymentStatus || ''},${row.paymentMethod || ''},${desc},${row.reference || ''}`;
     }).join('\n');
 
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename=transactions_export.csv');
-    res.status(200).send(headers + rows);
+    res.status(200).send(headers + csvRows);
   } catch (error: any) {
     logger.error(`Error in exportTransactions: ${error.message}`);
     res.status(500).json({ success: false, message: error.message });

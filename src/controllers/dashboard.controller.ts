@@ -1,5 +1,6 @@
 import { Response } from 'express';
 import { Donation } from '../models/Donation';
+import { IncomeLedger } from '../models/IncomeLedger';
 import { Asset } from '../models/Asset';
 import { FinancialTransaction } from '../models/FinancialTransaction';
 import { AuditLog } from '../models/AuditLog';
@@ -9,12 +10,9 @@ import logger from '../config/logger';
 // 1. Overview Statistics
 export const getOverview = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    // Total donations (Monetary sums)
-    const donationsSumResult = await Donation.aggregate([
-      { $match: { status: { $ne: 'Cancelled' } } },
-      { $group: { _id: null, total: { $sum: '$amount' } } },
-    ]);
-    const totalDonations = donationsSumResult[0]?.total || 0;
+    const donations = await Donation.find({ status: { $ne: 'Cancelled' } });
+    const totalDonations = donations.reduce((sum: number, donation: any) => sum + (donation.amount || 0), 0);
+    const incomeLedgers = await IncomeLedger.find({});
 
     // Total assets valuation
     const assetsSumResult = await Asset.aggregate([
@@ -23,12 +21,15 @@ export const getOverview = async (req: AuthRequest, res: Response): Promise<void
     ]);
     const totalAssetsValue = assetsSumResult[0]?.total || 0;
 
-    // Total ledger financials
-    const ledgerSumResult = await FinancialTransaction.aggregate([
-      { $group: { _id: '$type', total: { $sum: '$amount' } } },
-    ]);
-    const totalIncome = ledgerSumResult.find((r) => r._id === 'Income')?.total || 0;
-    const totalExpense = ledgerSumResult.find((r) => r._id === 'Expense')?.total || 0;
+    const ledgerTransactions = await FinancialTransaction.find({});
+    const totalIncome =
+      incomeLedgers.reduce((sum: number, entry: any) => sum + (entry.paidAmount || 0), 0) +
+      ledgerTransactions
+        .filter((txn: any) => txn.type === 'Income')
+        .reduce((sum: number, txn: any) => sum + (txn.amount || 0), 0);
+    const totalExpense = ledgerTransactions
+      .filter((txn: any) => txn.type === 'Expense')
+      .reduce((sum: number, txn: any) => sum + (txn.amount || 0), 0);
 
     // Recent activities (Last 6 Audit Logs)
     const recentActivities = await AuditLog.find()
@@ -40,21 +41,6 @@ export const getOverview = async (req: AuthRequest, res: Response): Promise<void
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
     sixMonthsAgo.setDate(1);
 
-    const monthlyTrendsAgg = await FinancialTransaction.aggregate([
-      { $match: { date: { $gte: sixMonthsAgo } } },
-      {
-        $group: {
-          _id: {
-            year: { $year: '$date' },
-            month: { $month: '$date' },
-            type: '$type',
-          },
-          total: { $sum: '$amount' },
-        },
-      },
-      { $sort: { '_id.year': 1, '_id.month': 1 } },
-    ]);
-
     const trendMap: any = {};
     for (let i = 0; i < 6; i++) {
       const d = new Date();
@@ -64,12 +50,19 @@ export const getOverview = async (req: AuthRequest, res: Response): Promise<void
       trendMap[key] = { key, label, income: 0, expense: 0 };
     }
 
-    monthlyTrendsAgg.forEach((t) => {
-      const key = `${t._id.year}-${String(t._id.month).padStart(2, '0')}`;
-      if (trendMap[key]) {
-        if (t._id.type === 'Income') trendMap[key].income = t.total;
-        else if (t._id.type === 'Expense') trendMap[key].expense = t.total;
-      }
+    ledgerTransactions.forEach((transaction: any) => {
+      const txnDate = new Date(transaction.date);
+      const key = `${txnDate.getFullYear()}-${String(txnDate.getMonth() + 1).padStart(2, '0')}`;
+      if (!trendMap[key]) return;
+      if (transaction.type === 'Income') trendMap[key].income += transaction.amount || 0;
+      if (transaction.type === 'Expense') trendMap[key].expense += transaction.amount || 0;
+    });
+
+    incomeLedgers.forEach((entry: any) => {
+      const txnDate = new Date(entry.transactionDate);
+      const key = `${txnDate.getFullYear()}-${String(txnDate.getMonth() + 1).padStart(2, '0')}`;
+      if (!trendMap[key]) return;
+      trendMap[key].income += entry.paidAmount || 0;
     });
 
     const monthlyTrends = Object.values(trendMap).reverse();
@@ -97,41 +90,37 @@ export const getOverview = async (req: AuthRequest, res: Response): Promise<void
 // 2. Donation Statistics
 export const getDonationsStats = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    // Total count & sum
-    const generalStats = await Donation.aggregate([
-      { $match: { status: { $ne: 'Cancelled' } } },
-      {
-        $group: {
-          _id: null,
-          totalAmount: { $sum: '$amount' },
-          count: { $sum: 1 },
-        },
-      },
-    ]);
+    const donations = await Donation.find({ status: { $ne: 'Cancelled' } });
+    const generalStats = {
+      totalAmount: donations.reduce((sum: number, donation: any) => sum + (donation.amount || 0), 0),
+      collectedAmount: donations.reduce((sum: number, donation: any) => sum + (donation.paidAmount || 0), 0),
+      outstandingDues: donations.reduce((sum: number, donation: any) => sum + (donation.dueAmount || 0), 0),
+      count: donations.length,
+    };
 
-    // Breakdown by payment methods
-    const methodBreakdown = await Donation.aggregate([
-      { $match: { status: { $ne: 'Cancelled' } } },
-      {
-        $group: {
-          _id: '$paymentMethod',
-          totalAmount: { $sum: '$amount' },
-          count: { $sum: 1 },
-        },
-      },
-    ]);
+    const methodBreakdown = Object.values(
+      donations.reduce((acc: any, donation: any) => {
+        const key = donation.paymentMethod || 'Unspecified';
+        if (!acc[key]) acc[key] = { _id: key, totalAmount: 0, paidAmount: 0, dueAmount: 0, count: 0 };
+        acc[key].totalAmount += donation.amount || 0;
+        acc[key].paidAmount += donation.paidAmount || 0;
+        acc[key].dueAmount += donation.dueAmount || 0;
+        acc[key].count += 1;
+        return acc;
+      }, {})
+    );
 
-    // Breakdown by donation type (Cash, Gold, Silver, etc.)
-    const typeBreakdown = await Donation.aggregate([
-      { $match: { status: { $ne: 'Cancelled' } } },
-      {
-        $group: {
-          _id: '$donationType',
-          totalAmount: { $sum: '$amount' },
-          count: { $sum: 1 },
-        },
-      },
-    ]);
+    const typeBreakdown = Object.values(
+      donations.reduce((acc: any, donation: any) => {
+        const key = donation.donationType || 'Unspecified';
+        if (!acc[key]) acc[key] = { _id: key, totalAmount: 0, paidAmount: 0, dueAmount: 0, count: 0 };
+        acc[key].totalAmount += donation.amount || 0;
+        acc[key].paidAmount += donation.paidAmount || 0;
+        acc[key].dueAmount += donation.dueAmount || 0;
+        acc[key].count += 1;
+        return acc;
+      }, {})
+    );
 
     res.json({
       success: true,
