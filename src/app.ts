@@ -521,65 +521,49 @@ async function bootstrapData() {
       logger.info('🌱 Seeded history timeline.');
     }
 
-    const assetCount = await Asset.countDocuments();
-    if (assetCount === 0) {
-      await Asset.create([
-        {
-          assetName: 'Main Temple Complex',
-          category: 'Land & Buildings',
-          notes: 'The primary temple structure including the sanctum sanctorum, assembly hall, and surrounding pathways.',
-          acquisitionDate: new Date('1985-05-10'),
-          currentValue: 150000000,
-          purchaseValue: 5000000,
-          status: 'Excellent',
-          location: 'Main Campus',
-        },
-        {
-          assetName: 'Maa Durga Golden Crown',
-          category: 'Gold',
-          notes: 'Intricately carved golden crown (Mukut) weighing 2.5kg offered to the main deity.',
-          acquisitionDate: new Date('2010-10-05'),
-          currentValue: 18000000,
-          purchaseValue: 8000000,
-          status: 'Excellent',
-          location: 'Main Sanctum / Safe',
-        },
-      ]);
-      logger.info('🌱 Seeded assets.');
+    // Clean up test assets if present
+    const testAssetsToDelete = await Asset.deleteMany({
+      assetName: { $in: ['Main Temple Complex', 'Maa Durga Golden Crown', 'Silver Chariot (Rath)'] }
+    });
+    if (testAssetsToDelete.deletedCount > 0) {
+      logger.info(`🧹 Cleaned up ${testAssetsToDelete.deletedCount} test assets.`);
+    }
+
+    // Clean up test data if present (Rahul Sharma Family, Anonymous Devotee, HUNDI-W40, SAL-SEP-23)
+    const testDonationsToDelete = await Donation.find({
+      donorName: { $in: ['Rahul Sharma Family', 'Anonymous Devotee'] }
+    });
+    if (testDonationsToDelete.length > 0) {
+      const deletedIds = testDonationsToDelete.map(d => d._id);
+      await Donation.deleteMany({ _id: { $in: deletedIds } });
+      await IncomeLedger.deleteMany({ sourceId: { $in: deletedIds } });
+      logger.info(`🧹 Cleaned up ${testDonationsToDelete.length} test donations and matching income ledgers.`);
+    }
+
+    const testTxnsToDelete = await FinancialTransaction.deleteMany({
+      reference: { $in: ['HUNDI-W40', 'SAL-SEP-23'] }
+    });
+    if (testTxnsToDelete.deletedCount > 0) {
+      logger.info(`🧹 Cleaned up ${testTxnsToDelete.deletedCount} test transactions.`);
     }
 
     const donationCount = await Donation.countDocuments();
     if (donationCount === 0) {
       await Donation.create([
         {
-          donorName: 'Rahul Sharma Family',
+          donorName: 'Priya Patel',
           donationType: 'Annadanam',
-          amount: 51000,
-          purpose: 'Navratri Mahotsav Sponsorship',
-          paymentMethod: 'UPI',
+          amount: 11000,
+          purpose: 'Annadanam',
+          paymentMethod: 'Bank Transfer',
           paymentStatus: 'Paid',
-          paidAmount: 51000,
+          paidAmount: 11000,
           dueAmount: 0,
-          receiptNumber: 'TMP-2026-000001',
+          receiptNumber: 'TMP-2026-000003',
           isPublic: true,
           status: 'Verified',
-          donationDate: new Date('2026-06-15'),
-          date: new Date('2026-06-15'),
-        },
-        {
-          donorName: 'Anonymous Devotee',
-          donationType: 'Temple Construction',
-          amount: 100000,
-          purpose: 'Sanctum restoration support',
-          paymentMethod: 'Bank Transfer',
-          paymentStatus: 'Partial',
-          paidAmount: 60000,
-          dueAmount: 40000,
-          receiptNumber: 'TMP-2026-000002',
-          isPublic: false,
-          status: 'Pending',
-          donationDate: new Date('2026-06-18'),
-          date: new Date('2026-06-18'),
+          donationDate: new Date('2026-06-20'),
+          date: new Date('2026-06-20'),
         },
       ]);
       logger.info('🌱 Seeded donations.');
@@ -614,20 +598,28 @@ async function bootstrapData() {
     if (txnCount === 0) {
       await FinancialTransaction.create([
         {
-          date: new Date('2023-10-01'),
+          date: new Date('2023-10-10'),
           type: 'Income',
-          category: 'Hundi Collection',
-          amount: 250000,
-          description: 'Weekly hundi counting',
-          reference: 'HUNDI-W40',
+          category: 'Special Pooja',
+          amount: 85000,
+          description: 'Navchandi Havan bookings',
+          reference: 'POOJA-NC',
         },
         {
-          date: new Date('2023-10-05'),
+          date: new Date('2023-10-15'),
           type: 'Expense',
-          category: 'Employee Salaries',
-          amount: 180000,
-          description: 'September salaries for priests and staff',
-          reference: 'SAL-SEP-23',
+          category: 'Maintenance',
+          amount: 45000,
+          description: 'Flower decoration and temple cleaning supplies',
+          reference: 'MAINT-10',
+        },
+        {
+          date: new Date('2023-10-20'),
+          type: 'Income',
+          category: 'Donations',
+          amount: 150000,
+          description: 'Online donations via portal',
+          reference: 'PG-SETTLE-10',
         },
       ]);
       logger.info('🌱 Seeded transactions.');
