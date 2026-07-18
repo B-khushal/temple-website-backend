@@ -44,6 +44,10 @@ import mongoose from 'mongoose';
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Trust the first proxy (e.g. Render, Heroku, Nginx) for express-rate-limit
+app.set('trust proxy', 1);
+
+
 // 1. Establish Database Connection
 connectDB().then(() => {
   bootstrapData();

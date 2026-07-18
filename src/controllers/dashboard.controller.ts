@@ -125,7 +125,7 @@ export const getDonationsStats = async (req: AuthRequest, res: Response): Promis
     res.json({
       success: true,
       data: {
-        summary: generalStats[0] || { totalAmount: 0, count: 0 },
+        summary: generalStats,
         paymentMethods: methodBreakdown,
         donationTypes: typeBreakdown,
       },
