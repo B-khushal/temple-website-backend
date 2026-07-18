@@ -9,7 +9,7 @@ const router = Router();
 router.get('/', async (req, res) => {
   try {
     const timeline = await HistoryTimeline.find().sort({ order: 1, year: 1 });
-    res.json({ success: true, timeline });
+    res.json({ success: true, timeline, data: timeline });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -28,7 +28,7 @@ router.post(
       });
       await timeline.save();
       await logActivity(req, 'CREATE_HISTORY_TIMELINE', 'HistoryTimeline', timeline._id.toString(), null, timeline.toObject());
-      res.status(201).json({ success: true, timeline });
+      res.status(201).json({ success: true, timeline, data: timeline });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
     }
@@ -51,7 +51,7 @@ router.put(
       Object.assign(timeline, req.body);
       await timeline.save();
       await logActivity(req, 'UPDATE_HISTORY_TIMELINE', 'HistoryTimeline', id, original, timeline.toObject());
-      res.json({ success: true, timeline });
+      res.json({ success: true, timeline, data: timeline });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
     }

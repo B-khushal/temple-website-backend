@@ -9,7 +9,7 @@ const router = Router();
 router.get('/', async (req, res) => {
   try {
     const founders = await Founder.find().sort({ order: 1 });
-    res.json({ success: true, founders });
+    res.json({ success: true, founders, data: founders });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -28,7 +28,7 @@ router.post(
       });
       await founder.save();
       await logActivity(req, 'CREATE_FOUNDER', 'Founder', founder._id.toString(), null, founder.toObject());
-      res.status(201).json({ success: true, founder });
+      res.status(201).json({ success: true, founder, data: founder });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
     }
@@ -51,7 +51,7 @@ router.put(
       Object.assign(founder, req.body);
       await founder.save();
       await logActivity(req, 'UPDATE_FOUNDER', 'Founder', id, original, founder.toObject());
-      res.json({ success: true, founder });
+      res.json({ success: true, founder, data: founder });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
     }
